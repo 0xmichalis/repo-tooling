@@ -137,7 +137,7 @@ jobs:
           tag_name: ${{ inputs.tag }}
           draft: false
           prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
-          make_latest: ${{ needs.build.outputs.prerelease == 'true' && 'false' || 'true' }}
+          make_latest: ${{ needs.build.outputs.prerelease == 'true' && 'false' || 'legacy' }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |

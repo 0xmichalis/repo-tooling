@@ -66,6 +66,7 @@ jobs:
               raise SystemExit(f"Cargo.toml version v{version} does not match tag {tag}")
           PY
 
+      # Image latest follows the default branch head, including matching tag builds.
       - name: Build and publish signed image
         uses: 0xmichalis/repo-tooling/actions/publish-image@07457c5c82d294d8060f4dc1d8156c799f3d9a9f
         with:

@@ -103,7 +103,7 @@ jobs:
   dockerfile-lint:
     uses: ./.github/workflows/dockerfile-lint.yml
     with:
-      dockerfile: tests/fixtures/docker/Dockerfile
+      dockerfile: tests/fixtures/docker context/Dockerfile
 
   npm:
     name: npm lifecycle scripts disabled
@@ -198,7 +198,7 @@ jobs:
         id: publish
         with:
           image: localhost:5000/fixture:test
-          build-context: tests/fixtures/docker
+          build-context: tests/fixtures/docker context
           signing-key: ${{ steps.key.outputs.key }}
           signing-password: fixture-password
           token: ${{ github.token }}

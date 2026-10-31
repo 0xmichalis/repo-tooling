@@ -43,6 +43,18 @@ class PublishTests(unittest.TestCase):
                     publish.publish("ghcr.io/owner/app:sha-test", True, True, "owner/app", "main")
                 self.assertFalse(any(call.args[0][:2] == ["docker", "buildx"] for call in command.call_args_list))
 
+    def test_release_tags_follow_the_same_current_head_image_policy(self):
+        for tag in ["v1.0.0", "v1.1.0-rc.1"]:
+            for current in [SHA, "c" * 40]:
+                def execute(arguments):
+                    if arguments[:2] == ["gh", "api"]:
+                        return current
+                    return self.outputs(arguments)
+                with self.subTest(tag=tag, current=current), patch.object(publish, "command", side_effect=execute) as command:
+                    publish.publish(f"ghcr.io/owner/app:{tag}", True, True, "owner/app", "main")
+                    promoted = any(call.args[0][:2] == ["docker", "buildx"] for call in command.call_args_list)
+                    self.assertEqual(promoted, current == SHA)
+
     def test_ambiguous_push_digest_is_rejected(self):
         with patch.object(publish, "command", return_value=f"digest: {DIGEST}\ndigest: sha256:{'c' * 64}") as command:
             with self.assertRaises(ValueError):

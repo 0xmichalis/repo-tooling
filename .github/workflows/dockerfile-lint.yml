@@ -20,6 +20,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # The pinned action re-evaluates its arguments in Bash.
+      - name: Escape Dockerfile path
+        id: dockerfile
+        env:
+          DOCKERFILE: ${{ inputs.dockerfile }}
+        run: printf 'path=%q\n' "$DOCKERFILE" >> "$GITHUB_OUTPUT"
+
       - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
-          dockerfile: ${{ inputs.dockerfile }}
+          dockerfile: -- ${{ steps.dockerfile.outputs.path }}

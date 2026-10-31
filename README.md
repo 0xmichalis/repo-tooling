@@ -106,6 +106,8 @@ Docker build, signing, verification and promotion of the verified digest to
 `latest` while the commit is the current default branch head. CI images use
 `sha-<caller commit>` tags. Set `release-tag` to check out `refs/tags/<tag>` and
 require the root Cargo package version to match before building the release image.
+Tag builds use the same current-head policy for image `latest`; GitHub Release
+latest selection is separate.
 The `image` output gives subsequent release jobs the full published image tag.
 Callers retain triggers, test gates and publication concurrency, and grant
 `contents: read` and `packages: write` to the calling job.
@@ -148,8 +150,10 @@ Keep tag-push and manual triggers in the caller and grant the calling job
 Build jobs use read-only tokens and always check out the release tag.
 Version tags may include prerelease and build-metadata suffixes. Prereleases
 are marked explicitly and cannot replace the latest stable release.
+Stable releases use GitHub's `legacy` latest selection.
 For build validation, `publish-release: false` checks out the caller commit,
-uploads the same archives and skips release creation without requiring a tag.
+uploads the same archives and skips release creation. A valid `tag` string is
+still required for archive names, but the Git tag does not need to exist.
 
 Custom release pipelines can instead pass a built binary's `binary`, `tag` and
 `target` to `actions/package-rust-binary`. It reads
