@@ -13,6 +13,7 @@ project-specific checks. Shared implementations own their tool versions.
 | `.github/workflows/rust-audit.yml` | Audit the caller's default branch and maintain one rolling vulnerability issue. |
 | `.github/workflows/node-ci.yml` | Locked pnpm install, formatting, lint, type checks, optional tests and build. |
 | `.github/workflows/markdownlint.yml` | Markdown lint with caller-selected file globs and configuration. |
+| `.github/workflows/dockerfile-lint.yml` | Hadolint checks for a caller-selected Dockerfile. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
 | `actions/publish-image` | Push a built image, sign and verify its digest, then promote the current default branch head to `latest`. |
@@ -47,15 +48,20 @@ jobs:
 Markdown lint accepts newline-delimited `globs` and an optional `config` path.
 It uses the caller's Markdown configuration and fails on lint errors; it does
 not rewrite files. See [`examples/markdownlint.yml`](examples/markdownlint.yml).
+Dockerfile lint accepts `dockerfile`, defaulting to `Dockerfile`, and uses the
+caller's Hadolint configuration.
 
 Rust CI uses the caller's Rust toolchain configuration when present, otherwise
-the runner's active toolchain. It requires a committed `Cargo.lock` and a
-caller-owned `deny.toml` with an explicit license allowlist; see
+the runner's active toolchain. It requires a committed `Cargo.lock`. Cargo-deny
+is enabled by default and requires a caller-owned `deny.toml` with an explicit
+license allowlist; see
 [`examples/deny.toml`](examples/deny.toml). Cargo-deny is installed with its
 required Rust 1.88 toolchain without changing the project's selected compiler.
 Set `run-tests: false` when a caller job already runs coverage or specialized
 tests. Format, Clippy, check and cargo-deny still run. Specialized database,
 coverage, code generation and browser checks belong in caller workflows.
+Callers without a cargo-deny policy can set `run-deny: false`.
+Cargo-sort uses its upstream release binary with a pinned SHA-256 checksum.
 
 ## Adoption
 
@@ -149,7 +155,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 ```
 
 CI exercises shared CI workflows with fixtures, caller-owned Rust tests,
-Node 22 and 26, custom package scripts and tests, a skipped build, Markdown lint, npm with
+Node 22 and 26, custom package scripts and tests, a skipped build, Markdown and
+Dockerfile lint, npm with
 lifecycle scripts disabled, rejected stale pnpm lockfiles and a real
 cargo-audit report. Unit tests cover advisory exceptions, issue pagination,
 create/update/close behavior, oversized reports and operational failures.

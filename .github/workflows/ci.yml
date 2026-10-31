@@ -100,6 +100,11 @@ jobs:
       globs: tests/fixtures/markdownlint/**/*.md
       config: tests/fixtures/markdownlint/policy.markdownlint-cli2.jsonc
 
+  dockerfile-lint:
+    uses: ./.github/workflows/dockerfile-lint.yml
+    with:
+      dockerfile: tests/fixtures/docker/Dockerfile
+
   npm:
     name: npm lifecycle scripts disabled
     runs-on: ubuntu-latest
