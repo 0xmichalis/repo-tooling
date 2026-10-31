@@ -30,6 +30,48 @@ jobs:
     with:
       working-directory: tests/fixtures/rust
 
+  rust-custom-tests:
+    name: Rust caller with its own tests
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      working-directory: tests/fixtures/rust
+      run-tests: false
+
+  binary-release:
+    name: Build binary release artifacts without publishing
+    uses: ./.github/workflows/rust-binary-release.yml
+    permissions:
+      contents: write
+    with:
+      binary: workflow-fixture
+      tag: v0.1.0
+      working-directory: tests/fixtures/rust
+      publish-release: false
+      targets: |
+        [
+          {"target":"x86_64-unknown-linux-musl","os":"ubuntu-latest","builder":"cross"},
+          {"target":"aarch64-apple-darwin","os":"macos-latest","builder":"cargo"},
+          {"target":"x86_64-apple-darwin","os":"macos-latest","builder":"cargo"}
+        ]
+
+  verify-binary-release:
+    name: Verify binary release archives
+    needs: binary-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: workflow-fixture-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Verify contents, checksums, architectures and the Linux executable
+        run: python3 tests/check_binary_release.py
+
   node:
     name: Node caller (${{ matrix.node }})
     strategy:
