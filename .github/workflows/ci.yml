@@ -30,8 +30,8 @@ jobs:
     with:
       working-directory: tests/fixtures/rust
 
-  rust-custom-tests:
-    name: Rust caller with its own tests
+  rust-without-tests:
+    name: Rust caller without shared tests
     uses: ./.github/workflows/rust-ci.yml
     with:
       working-directory: tests/fixtures/rust
