@@ -1,0 +1,13 @@
+{
+  "name": "custom-pnpm-workflow-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "format": "node check.cjs format",
+    "lint": "node check.cjs lint",
+    "typecheck": "node check.cjs typecheck",
+    "test:ci": "node check.cjs test",
+    "build": "node -e 'process.exit(1)'"
+  }
+}

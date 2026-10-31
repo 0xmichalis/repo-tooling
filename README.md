@@ -10,19 +10,42 @@ project-specific checks. Shared implementations own their tool versions.
 | --- | --- |
 | `.github/workflows/rust-ci.yml` | Format, cargo-sort, clippy, check, tests and cargo-deny for a standard Rust crate/workspace. |
 | `.github/workflows/rust-audit.yml` | Audit the caller's default branch and maintain one rolling vulnerability issue. |
-| `.github/workflows/node-ci.yml` | Locked pnpm install, `format:check`, `lint`, `type-check` and `build`. |
+| `.github/workflows/node-ci.yml` | Locked pnpm install, formatting, lint, type checks, optional tests and build. |
+| `.github/workflows/markdownlint.yml` | Markdown lint with caller-selected file globs and configuration. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
 | `actions/publish-image` | Push a built image, sign and verify its digest, then promote the current default branch head to `latest`. |
 | `actions/cargo-tag` | Tag a root Cargo version bump and dispatch `release.yml`, with retryable dispatch failures. |
 | `actions/package-rust-binary` | Archive a built target binary, README and license with a SHA-256 checksum on Linux or macOS. |
 
-All workflows accept `working-directory`, defaulting to `.`. Node CI requires
+Rust and Node workflows accept `working-directory`, defaulting to `.`. Node CI requires
 `node-version`. The Node setup action reads the pnpm version from the caller's
 `packageManager` field; it accepts `package-manager: npm`,
 `install-dependencies: "false"` and `ignore-scripts: "true"` where needed.
 Custom Node jobs may pass `node-version-file` instead of `node-version` to
 preserve an existing `.nvmrc` as the runtime source of truth.
+
+Node CI defaults to the `format:check`, `lint`, `type-check` and `build` package
+scripts. Set `format-script` or `typecheck-script` to use the caller's existing
+names, and `test-script` to run tests. Set `build-script: ""` when another
+caller job owns the build, such as a browser test job. These inputs name package
+scripts; they do not contain shell commands. For example:
+
+```yaml
+jobs:
+  checks:
+    uses: 0xmichalis/repo-tooling/.github/workflows/node-ci.yml@v1.1.0
+    with:
+      node-version: "22"
+      format-script: format
+      typecheck-script: typecheck
+      test-script: test:ci
+      build-script: ""
+```
+
+Markdown lint accepts newline-delimited `globs` and an optional `config` path.
+It uses the caller's Markdown configuration and fails on lint errors; it does
+not rewrite files. See [`examples/markdownlint.yml`](examples/markdownlint.yml).
 
 Rust CI uses the caller's Rust toolchain configuration when present, otherwise
 the runner's active toolchain. It requires a committed `Cargo.lock` and a
@@ -87,6 +110,10 @@ requested commit, and dispatches the caller's `release.yml` on its default
 branch. It never moves existing tags. Rerunning a failed dispatch resumes the
 same tag when it already points to that commit. Callers retain their existing
 CI/release gates and artifact build matrices.
+Serialize tagging with `queue: max`, as in [`examples/cargo-tag.yml`](examples/cargo-tag.yml),
+so a newer push cannot replace a pending version-bump run. The shared CI pins
+actionlint v1.7.12, which does not yet recognize that GitHub concurrency key;
+the example is validated by the consumer workflow runs.
 
 After building a binary, pass its `binary`, `tag` and `target` to
 `actions/package-rust-binary`. It reads `target/<target>/release/<binary>`,
@@ -104,7 +131,8 @@ python3 -m unittest discover -s tests -v
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 ```
 
-CI exercises both shared CI workflows with fixtures, Node 22 and 26, npm with
+CI exercises shared CI workflows with fixtures, Node 22 and 26, custom package
+scripts and tests, a skipped build, Markdown lint, npm with
 lifecycle scripts disabled, rejected stale pnpm lockfiles and a real
 cargo-audit report. Unit tests cover advisory exceptions, issue pagination,
 create/update/close behavior, oversized reports and operational failures.
