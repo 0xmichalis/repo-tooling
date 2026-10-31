@@ -14,6 +14,7 @@ project-specific checks. Shared implementations own their tool versions.
 | `.github/workflows/node-ci.yml` | Locked pnpm install, formatting, lint, type checks, optional tests and build. |
 | `.github/workflows/markdownlint.yml` | Markdown lint with caller-selected file globs and configuration. |
 | `.github/workflows/dockerfile-lint.yml` | Hadolint checks for a caller-selected Dockerfile. |
+| `.github/workflows/rust-docker-publish.yml` | Check out, build and publish a signed Rust service image from a caller commit or validated version tag. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
 | `actions/publish-image` | Optionally build an image and log in to GHCR, push it, sign and verify its digest, then promote the current default branch head to `latest`. |
@@ -98,6 +99,16 @@ tables are supported. Issue bodies are bounded below GitHub's size limit, and
 the workflow log retains the full JSON audit report.
 
 ## Development and releases
+
+Rust services call `rust-docker-publish.yml` with the untagged `image` repository
+and `signing-key` / `signing-password` secrets. It owns checkout, GHCR login,
+Docker build, signing, verification and promotion of the verified digest to
+`latest` while the commit is the current default branch head. CI images use
+`sha-<caller commit>` tags. Set `release-tag` to check out `refs/tags/<tag>` and
+require the root Cargo package version to match before building the release image.
+The `image` output gives subsequent release jobs the full published image tag.
+Callers retain triggers, test gates and publication concurrency, and grant
+`contents: read` and `packages: write` to the calling job.
 
 Container callers retain their vulnerability scan, triggers and publication
 concurrency. Pass the `image` tag, existing
