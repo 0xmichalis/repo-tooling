@@ -38,7 +38,7 @@ class PublishTests(unittest.TestCase):
                 if arguments[:2] == ["cosign", failed]:
                     raise subprocess.CalledProcessError(1, arguments)
                 return self.outputs(arguments)
-            with self.subTest(step=failed), patch.object(publish, "command", side_effect=execute) as command:
+            with self.subTest(step=failed), patch.object(publish, "command", side_effect=execute) as command, patch.object(publish.time, "sleep"):
                 with self.assertRaises(subprocess.CalledProcessError):
                     publish.publish("ghcr.io/owner/app:sha-test", True, True, "owner/app", "main")
                 self.assertFalse(any(call.args[0][:2] == ["docker", "buildx"] for call in command.call_args_list))
@@ -79,6 +79,15 @@ class PublishTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     publish.publish(image, True, True, "owner/app", "main")
                 command.assert_not_called()
+
+    def test_transparency_log_is_required_by_default_and_optional_for_offline_registries(self):
+        for required in [True, False]:
+            with self.subTest(required=required), patch.object(publish, "command", side_effect=self.outputs) as command:
+                publish.publish("localhost:5000/app:test", False, True, "owner/app", "main", required)
+                sign = next(call.args[0] for call in command.call_args_list if call.args[0][:2] == ["cosign", "sign"])
+                verify = next(call.args[0] for call in command.call_args_list if call.args[0][:2] == ["cosign", "verify"])
+                self.assertIn(f"--tlog-upload={'true' if required else 'false'}", sign)
+                self.assertEqual("--insecure-ignore-tlog=true" in verify, not required)
 
 
 if __name__ == "__main__":

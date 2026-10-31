@@ -6,13 +6,15 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import quote
 
 
 def command(arguments):
-    result = subprocess.run(arguments, text=True, capture_output=True, check=True)
+    result = subprocess.run(arguments, text=True, capture_output=True, check=False)
     print(result.stdout, end="")
     print(result.stderr, end="", file=sys.stderr)
+    result.check_returncode()
     return result.stdout
 
 
@@ -22,7 +24,7 @@ def boolean(value):
     return value == "true"
 
 
-def publish(image, promote, require_head, repository, branch):
+def publish(image, promote, require_head, repository, branch, transparency_log=True):
     if (
         image.startswith("-")
         or "@" in image
@@ -37,16 +39,25 @@ def publish(image, promote, require_head, repository, branch):
     digest = digests.pop()
     name = image.rsplit(":", 1)[0]
     reference = f"{name}@{digest}"
-    command([
-        "cosign", "sign", "--yes", "--recursive", "--tlog-upload=false",
-        "--key", "env://COSIGN_PRIVATE_KEY", reference,
-    ])
+    for attempt in range(3):
+        try:
+            command([
+                "cosign", "sign", "--yes", "--recursive",
+                f"--tlog-upload={'true' if transparency_log else 'false'}",
+                "--key", "env://COSIGN_PRIVATE_KEY", reference,
+            ])
+            break
+        except subprocess.CalledProcessError:
+            if attempt == 2:
+                raise
+            time.sleep((attempt + 1) * 10)
     with tempfile.TemporaryDirectory(dir=os.environ.get("RUNNER_TEMP")) as directory:
         public_key = Path(directory) / "cosign.pub"
         public_key.write_text(command(["cosign", "public-key", "--key", "env://COSIGN_PRIVATE_KEY"]))
-        command([
-            "cosign", "verify", "--insecure-ignore-tlog=true", "--key", str(public_key), reference,
-        ])
+        verify = ["cosign", "verify", "--key", str(public_key), reference]
+        if not transparency_log:
+            verify.append("--insecure-ignore-tlog=true")
+        command(verify)
     if promote:
         if require_head:
             if not branch:
@@ -75,6 +86,7 @@ def main():
         boolean(os.environ["REQUIRE_CURRENT_HEAD"]),
         os.environ["GITHUB_REPOSITORY"],
         os.environ.get("DEFAULT_BRANCH", ""),
+        boolean(os.environ["TRANSPARENCY_LOG"]),
     )
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         output.write(f"digest={digest}\n")
