@@ -140,6 +140,7 @@ jobs:
           signing-password: fixture-password
           token: ${{ github.token }}
           require-current-head: "false"
+          transparency-log: "false"
 
       - name: Verify latest points to the signed digest
         env:

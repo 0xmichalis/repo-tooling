@@ -75,6 +75,9 @@ existing key-based verifiers. A failed push, signature, verification or branch
 lookup cannot promote `latest`. Use `promote-latest: "false"` for release-only
 tags; `require-current-head: "false"` supports an explicitly different caller
 promotion policy.
+Transparency-log signing and verification are required by default, and signing
+is retried three times. `transparency-log: "false"` supports offline registries;
+the ephemeral local-registry fixture uses that mode.
 
 The Cargo tagging action requires full history, `before-sha` from the push
 event, and a token with `contents: write` and `actions: write`. It reads the
