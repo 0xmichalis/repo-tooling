@@ -37,7 +37,8 @@ browser and release checks belong in caller workflows.
 Copy the appropriate wrapper from `examples/` and replace its reference with a
 full commit SHA from a tested release. Keep the release tag in an adjacent
 comment. Enable the `github-actions` ecosystem in the caller's own
-`.github/dependabot.yml` to receive updates through pull requests.
+`.github/dependabot.yml` to receive updates through pull requests. This
+repository schedules those updates on Saturday.
 
 Read-only CI needs `contents: read`. Scheduled audits additionally need
 `issues: write`; the implicit caller `GITHUB_TOKEN` is sufficient. Configure

@@ -13,4 +13,4 @@ permissions:
 
 jobs:
   checks:
-    uses: 0xmichalis/repo-tooling/.github/workflows/rust-ci.yml@a40f63d43ecdbc2aa82766de8ba7bf959f887fe7 # v1.0.0
+    uses: 0xmichalis/repo-tooling/.github/workflows/rust-ci.yml@v1.0.0
