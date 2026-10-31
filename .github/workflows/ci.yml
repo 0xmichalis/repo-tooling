@@ -49,7 +49,7 @@ jobs:
 
       - uses: ./actions/setup-node
         with:
-          node-version: "22"
+          node-version-file: tests/fixtures/npm/.nvmrc
           package-manager: npm
           working-directory: tests/fixtures/npm
           ignore-scripts: "true"
@@ -98,3 +98,78 @@ jobs:
         with:
           working-directory: tests/fixtures/rust
           token: ${{ github.token }}
+          report-issues: "false"
+
+  image:
+    name: Sign and verify an image in an ephemeral registry
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v2.6.5
+
+      - name: Build a test image and generate an ephemeral signing key
+        id: key
+        env:
+          COSIGN_PASSWORD: fixture-password
+        run: |
+          printf 'FROM scratch\nCOPY README.md /README.md\n' > "$RUNNER_TEMP/Dockerfile"
+          docker build --file "$RUNNER_TEMP/Dockerfile" --tag localhost:5000/fixture:test .
+          cosign generate-key-pair --output-key-prefix "$RUNNER_TEMP/fixture"
+          while IFS= read -r line; do
+            echo "::add-mask::$line"
+          done < "$RUNNER_TEMP/fixture.key"
+          {
+            echo 'key<<FIXTURE_KEY'
+            cat "$RUNNER_TEMP/fixture.key"
+            echo FIXTURE_KEY
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: ./actions/publish-image
+        id: publish
+        with:
+          image: localhost:5000/fixture:test
+          signing-key: ${{ steps.key.outputs.key }}
+          signing-password: fixture-password
+          token: ${{ github.token }}
+          require-current-head: "false"
+
+      - name: Verify latest points to the signed digest
+        env:
+          EXPECTED_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          actual=$(docker buildx imagetools inspect localhost:5000/fixture:latest --format '{{json .Manifest.Digest}}')
+          test "$actual" = "\"$EXPECTED_DIGEST\""
+          cosign verify --insecure-ignore-tlog=true --key "$RUNNER_TEMP/fixture.pub" localhost:5000/fixture:latest
+
+  package:
+    name: Binary archive (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create a built-binary fixture
+        run: |
+          mkdir -p target/fixture-target/release
+          printf 'fixture binary\n' > target/fixture-target/release/fixture
+          chmod 755 target/fixture-target/release/fixture
+
+      - uses: ./actions/package-rust-binary
+        with:
+          binary: fixture
+          tag: v1.0.0
+          target: fixture-target
+
+      - name: Check archive layout, permissions and checksums
+        run: python3 -m unittest discover -s tests -p test_package_binary.py -v

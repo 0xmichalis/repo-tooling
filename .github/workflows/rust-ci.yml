@@ -85,7 +85,7 @@ jobs:
         key: ${{ runner.os }}-cargo-build-${{ hashFiles(format('{0}/**/Cargo.lock', inputs.working-directory)) }}
 
     - name: Clippy
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 
   check:
     name: Check
@@ -114,7 +114,7 @@ jobs:
         key: ${{ runner.os }}-cargo-build-${{ hashFiles(format('{0}/**/Cargo.lock', inputs.working-directory)) }}
 
     - name: Cargo check
-      run: cargo check --workspace --all-targets --all-features
+      run: cargo check --locked --workspace --all-targets --all-features
 
   test:
     name: Run Tests
@@ -143,7 +143,7 @@ jobs:
         key: ${{ runner.os }}-cargo-build-${{ hashFiles(format('{0}/**/Cargo.lock', inputs.working-directory)) }}
 
     - name: Run tests
-      run: cargo test --workspace --all-features
+      run: cargo test --locked --workspace --all-features
 
   deny:
     name: Cargo Deny
@@ -175,14 +175,16 @@ jobs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.tool_cache }}/cargo-deny
-        key: cargo-deny-bin-${{ env.CARGO_DENY_VERSION }}
+        key: cargo-deny-bin-${{ env.CARGO_DENY_VERSION }}-rust1.88.0
 
     - name: Add cargo-deny to PATH
       run: echo "${{ runner.tool_cache }}/cargo-deny/bin" >> "$GITHUB_PATH"
 
     - name: Install cargo-deny
       if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
-      run: cargo install --root "${{ runner.tool_cache }}/cargo-deny" --version ${{ env.CARGO_DENY_VERSION }} --locked cargo-deny
+      run: |
+        rustup toolchain install 1.88.0 --profile minimal
+        cargo +1.88.0 install --root "${{ runner.tool_cache }}/cargo-deny" --version "$CARGO_DENY_VERSION" --locked cargo-deny
 
     - name: Run cargo deny
-      run: cargo deny check bans licenses sources
+      run: cargo deny --locked --workspace --all-features check bans licenses sources

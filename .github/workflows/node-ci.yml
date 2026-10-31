@@ -28,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: 0xmichalis/repo-tooling/actions/setup-node@c54763b14e08d7db3495ace5f41a6e52f59be631
+      - uses: 0xmichalis/repo-tooling/actions/setup-node@5a7433f0f8548dced1086d28bb1e0d8a15acb150
         with:
           node-version: ${{ inputs.node-version }}
           working-directory: ${{ inputs.working-directory }}

@@ -13,14 +13,23 @@ project-specific checks. Shared implementations own their tool versions.
 | `.github/workflows/node-ci.yml` | Locked pnpm install, `format:check`, `lint`, `type-check` and `build`. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
+| `actions/publish-image` | Push a built image, sign and verify its digest, then promote the current default branch head to `latest`. |
+| `actions/cargo-tag` | Tag a root Cargo version bump and dispatch `release.yml`, with retryable dispatch failures. |
+| `actions/package-rust-binary` | Archive a built target binary, README and license with a SHA-256 checksum on Linux or macOS. |
 
 All workflows accept `working-directory`, defaulting to `.`. Node CI requires
 `node-version`. The Node setup action reads the pnpm version from the caller's
 `packageManager` field; it accepts `package-manager: npm`,
 `install-dependencies: "false"` and `ignore-scripts: "true"` where needed.
+Custom Node jobs may pass `node-version-file` instead of `node-version` to
+preserve an existing `.nvmrc` as the runtime source of truth.
 
 Rust CI uses the caller's Rust toolchain configuration when present, otherwise
-the runner's active toolchain. Specialized database, coverage, code generation,
+the runner's active toolchain. It requires a committed `Cargo.lock` and a
+caller-owned `deny.toml` with an explicit license allowlist; see
+[`examples/deny.toml`](examples/deny.toml). Cargo-deny is installed with its
+required Rust 1.88 toolchain without changing the project's selected compiler.
+Specialized database, coverage, code generation,
 browser and release checks belong in caller workflows.
 
 ## Adoption
@@ -44,6 +53,9 @@ The reusable audit workflow always checks out the caller's default branch,
 including when dispatched from a feature branch. It queues concurrent runs so
 they do not race over the rolling issue. Findings fail the run and create or
 update `cargo audit: vulnerable dependencies`; a clean audit closes that issue.
+Nested working directories include their lockfile path in the issue title, so
+one directory's clean result cannot close another directory's findings. Set
+`report-issues: "false"` on the composite action for read-only CI audits.
 Malformed reports, command failures and GitHub API failures fail the run and
 never report an audit as clean.
 
@@ -54,6 +66,29 @@ tables are supported. Issue bodies are bounded below GitHub's size limit, and
 the workflow log retains the full JSON audit report.
 
 ## Development and releases
+
+Container callers retain their build, vulnerability scan, registry login,
+triggers and publication concurrency. Pass the built `image` tag, existing
+`signing-key` and `signing-password` secrets, and caller `token` to
+`actions/publish-image`. It keeps cosign v2.6.5 signatures compatible with
+existing key-based verifiers. A failed push, signature, verification or branch
+lookup cannot promote `latest`. Use `promote-latest: "false"` for release-only
+tags; `require-current-head: "false"` supports an explicitly different caller
+promotion policy.
+
+The Cargo tagging action requires full history, `before-sha` from the push
+event, and a token with `contents: write` and `actions: write`. It reads the
+root `package.version` or `workspace.package.version`, creates the tag on the
+requested commit, and dispatches the caller's `release.yml` on its default
+branch. It never moves existing tags. Rerunning a failed dispatch resumes the
+same tag when it already points to that commit. Callers retain their existing
+CI/release gates and artifact build matrices.
+
+After building a binary, pass its `binary`, `tag` and `target` to
+`actions/package-rust-binary`. It reads `target/<target>/release/<binary>`,
+`README.md` and `LICENSE`, and creates
+`<binary>-<tag>-<target>.tar.gz` plus `.tar.gz.sha256`. Upload and release
+publication stay in the caller.
 
 Use Python 3.11 or newer, Go and ShellCheck. Run from the repository root:
 
@@ -69,6 +104,10 @@ CI exercises both shared CI workflows with fixtures, Node 22 and 26, npm with
 lifecycle scripts disabled, rejected stale pnpm lockfiles and a real
 cargo-audit report. Unit tests cover advisory exceptions, issue pagination,
 create/update/close behavior, oversized reports and operational failures.
+An ephemeral registry test builds, signs, verifies and promotes an image with
+a temporary test key. Publication unit tests cover stale commits and failed
+signing/verification; tagging and archive tests cover recovery and artifact
+integrity.
 
 Reusable workflows pin this repository's composite actions as dependencies,
 just like third-party actions. When editing an action, commit it first, update

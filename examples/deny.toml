@@ -1,0 +1,10 @@
+[bans]
+multiple-versions = "warn"
+
+[licenses]
+# Choose the licenses permitted by the consuming project.
+allow = ["MIT", "Apache-2.0"]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
