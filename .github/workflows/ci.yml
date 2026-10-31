@@ -41,6 +41,23 @@ jobs:
       node-version: ${{ matrix.node }}
       working-directory: tests/fixtures/pnpm
 
+  node-custom:
+    name: Node caller with custom scripts and tests
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      node-version: "22"
+      working-directory: tests/fixtures/custom-pnpm
+      format-script: format
+      typecheck-script: typecheck
+      test-script: test:ci
+      build-script: ""
+
+  markdownlint:
+    uses: ./.github/workflows/markdownlint.yml
+    with:
+      globs: tests/fixtures/markdownlint/**/*.md
+      config: tests/fixtures/markdownlint/policy.jsonc
+
   npm:
     name: npm lifecycle scripts disabled
     runs-on: ubuntu-latest

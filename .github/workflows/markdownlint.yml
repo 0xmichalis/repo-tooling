@@ -1,0 +1,30 @@
+name: Markdown lint
+
+on:
+  workflow_call:
+    inputs:
+      globs:
+        description: Newline-delimited Markdown file globs, relative to the caller repository.
+        type: string
+        default: "*.{md,markdown}"
+      config:
+        description: Optional caller-owned markdownlint-cli2 configuration file.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e # v20.0.0
+        with:
+          globs: ${{ inputs.globs }}
+          config: ${{ inputs.config }}

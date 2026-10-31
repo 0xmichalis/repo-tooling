@@ -1,0 +1,17 @@
+name: Markdown lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    uses: 0xmichalis/repo-tooling/.github/workflows/markdownlint.yml@v1.1.0
+    with:
+      globs: |
+        *.md
+        docs/**/*.md

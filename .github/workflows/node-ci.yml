@@ -11,13 +11,29 @@ on:
         description: Directory containing package.json and pnpm-lock.yaml.
         type: string
         default: .
+      format-script:
+        description: Package script for formatting checks.
+        type: string
+        default: format:check
+      typecheck-script:
+        description: Package script for type checks.
+        type: string
+        default: type-check
+      test-script:
+        description: Optional package script for tests.
+        type: string
+        default: ""
+      build-script:
+        description: Package script for the build; empty skips it.
+        type: string
+        default: build
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build
+    name: Node checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -28,19 +44,32 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: 0xmichalis/repo-tooling/actions/setup-node@5a7433f0f8548dced1086d28bb1e0d8a15acb150
+      - uses: 0xmichalis/repo-tooling/actions/setup-node@78be7e03543cc551812bddc42ae01de122f2d161
         with:
           node-version: ${{ inputs.node-version }}
           working-directory: ${{ inputs.working-directory }}
 
       - name: Check formatting
-        run: pnpm format:check
+        env:
+          FORMAT_SCRIPT: ${{ inputs.format-script }}
+        run: pnpm run "$FORMAT_SCRIPT"
 
       - name: Run linter
         run: pnpm lint
 
       - name: Check types
-        run: pnpm type-check
+        env:
+          TYPECHECK_SCRIPT: ${{ inputs.typecheck-script }}
+        run: pnpm run "$TYPECHECK_SCRIPT"
+
+      - name: Run tests
+        if: inputs.test-script != ''
+        env:
+          TEST_SCRIPT: ${{ inputs.test-script }}
+        run: pnpm run "$TEST_SCRIPT"
 
       - name: Build project
-        run: pnpm build
+        if: inputs.build-script != ''
+        env:
+          BUILD_SCRIPT: ${{ inputs.build-script }}
+        run: pnpm run "$BUILD_SCRIPT"
