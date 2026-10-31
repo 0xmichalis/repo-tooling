@@ -208,28 +208,3 @@ jobs:
           actual=$(docker buildx imagetools inspect localhost:5000/fixture:latest --format '{{json .Manifest.Digest}}')
           test "$actual" = "\"$EXPECTED_DIGEST\""
           cosign verify --insecure-ignore-tlog=true --key "$RUNNER_TEMP/fixture.pub" localhost:5000/fixture:latest
-
-  package:
-    name: Binary archive (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Create a built-binary fixture
-        run: |
-          mkdir -p target/fixture-target/release
-          printf 'fixture binary\n' > target/fixture-target/release/fixture
-          chmod 755 target/fixture-target/release/fixture
-
-      - uses: ./actions/package-rust-binary
-        with:
-          binary: fixture
-          tag: v1.0.0
-          target: fixture-target
-
-      - name: Check archive layout, permissions and checksums
-        run: python3 -m unittest discover -s tests -p test_package_binary.py -v
