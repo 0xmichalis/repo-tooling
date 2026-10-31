@@ -169,7 +169,7 @@ python3 -m unittest discover -s tests -v
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 ```
 
-CI exercises shared CI workflows with fixtures, caller-owned Rust tests,
+CI exercises shared CI workflows with fixtures, Rust checks with and without shared tests,
 Node 22 and 26, custom package scripts and tests, a skipped build, Markdown and
 Dockerfile lint, npm with
 lifecycle scripts disabled, rejected stale pnpm lockfiles and a real
