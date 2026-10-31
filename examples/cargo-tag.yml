@@ -1,0 +1,29 @@
+name: Auto Tag on Version Bump
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+# Each push must run: a later push can have an unchanged Cargo version.
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: 0xmichalis/repo-tooling/actions/cargo-tag@v1.1.0
+        with:
+          before-sha: ${{ github.event.before }}
+          token: ${{ github.token }}

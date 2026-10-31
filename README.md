@@ -110,6 +110,10 @@ requested commit, and dispatches the caller's `release.yml` on its default
 branch. It never moves existing tags. Rerunning a failed dispatch resumes the
 same tag when it already points to that commit. Callers retain their existing
 CI/release gates and artifact build matrices.
+Serialize tagging with `queue: max`, as in [`examples/cargo-tag.yml`](examples/cargo-tag.yml),
+so a newer push cannot replace a pending version-bump run. The shared CI pins
+actionlint v1.7.12, which does not yet recognize that GitHub concurrency key;
+the example is validated by the consumer workflow runs.
 
 After building a binary, pass its `binary`, `tag` and `target` to
 `actions/package-rust-binary`. It reads `target/<target>/release/<binary>`,
