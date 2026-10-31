@@ -165,7 +165,7 @@ jobs:
           report-issues: "false"
 
   image:
-    name: Sign and verify an image in an ephemeral registry
+    name: Build, sign and verify an image in an ephemeral registry
     runs-on: ubuntu-latest
     services:
       registry:
@@ -179,13 +179,11 @@ jobs:
         with:
           cosign-release: v2.6.5
 
-      - name: Build a test image and generate an ephemeral signing key
+      - name: Generate an ephemeral signing key
         id: key
         env:
           COSIGN_PASSWORD: fixture-password
         run: |
-          printf 'FROM scratch\nCOPY README.md /README.md\n' > "$RUNNER_TEMP/Dockerfile"
-          docker build --file "$RUNNER_TEMP/Dockerfile" --tag localhost:5000/fixture:test .
           cosign generate-key-pair --output-key-prefix "$RUNNER_TEMP/fixture"
           while IFS= read -r line; do
             echo "::add-mask::$line"
@@ -200,6 +198,7 @@ jobs:
         id: publish
         with:
           image: localhost:5000/fixture:test
+          build-context: tests/fixtures/docker
           signing-key: ${{ steps.key.outputs.key }}
           signing-password: fixture-password
           token: ${{ github.token }}
@@ -210,6 +209,8 @@ jobs:
         env:
           EXPECTED_DIGEST: ${{ steps.publish.outputs.digest }}
         run: |
+          revision=$(docker image inspect localhost:5000/fixture:test --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+          test "$revision" = "$(git rev-parse --short HEAD)"
           actual=$(docker buildx imagetools inspect localhost:5000/fixture:latest --format '{{json .Manifest.Digest}}')
           test "$actual" = "\"$EXPECTED_DIGEST\""
           cosign verify --insecure-ignore-tlog=true --key "$RUNNER_TEMP/fixture.pub" localhost:5000/fixture:latest

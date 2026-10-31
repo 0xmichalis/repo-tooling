@@ -16,7 +16,7 @@ project-specific checks. Shared implementations own their tool versions.
 | `.github/workflows/dockerfile-lint.yml` | Hadolint checks for a caller-selected Dockerfile. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
-| `actions/publish-image` | Push a built image, sign and verify its digest, then promote the current default branch head to `latest`. |
+| `actions/publish-image` | Optionally build an image and log in to GHCR, push it, sign and verify its digest, then promote the current default branch head to `latest`. |
 | `actions/cargo-tag` | Tag a root Cargo version bump and dispatch `release.yml`, with retryable dispatch failures. |
 | `actions/package-rust-binary` | Archive a built target binary, README and license with a SHA-256 checksum on Linux or macOS. |
 
@@ -99,10 +99,14 @@ the workflow log retains the full JSON audit report.
 
 ## Development and releases
 
-Container callers retain their build, vulnerability scan, registry login,
-triggers and publication concurrency. Pass the built `image` tag, existing
+Container callers retain their vulnerability scan, triggers and publication
+concurrency. Pass the `image` tag, existing
 `signing-key` and `signing-password` secrets, and caller `token` to
-`actions/publish-image`. It keeps cosign v2.6.5 signatures compatible with
+`actions/publish-image`. Set `build-context: .` to share GHCR login and the Docker
+build with `--pull` and a `GIT_COMMIT` build argument from the checked-out commit.
+GHCR login uses the caller token and actor; other registries require caller-owned
+authentication. Omit `build-context` to publish an already built and authenticated
+image. The action keeps cosign v2.6.5 signatures compatible with
 existing key-based verifiers. A failed push, signature, verification or branch
 lookup cannot promote `latest`. Use `promote-latest: "false"` for release-only
 tags; `require-current-head: "false"` supports an explicitly different caller
