@@ -9,12 +9,15 @@ project-specific checks. Shared implementations own their tool versions.
 | Component | Contract |
 | --- | --- |
 | `.github/workflows/rust-ci.yml` | Format, cargo-sort, clippy, check, tests and cargo-deny for a standard Rust crate/workspace. |
+| `.github/workflows/rust-binary-release.yml` | Build a caller-selected target matrix, package binaries and checksums, and publish a GitHub Release. |
 | `.github/workflows/rust-audit.yml` | Audit the caller's default branch and maintain one rolling vulnerability issue. |
 | `.github/workflows/node-ci.yml` | Locked pnpm install, formatting, lint, type checks, optional tests and build. |
 | `.github/workflows/markdownlint.yml` | Markdown lint with caller-selected file globs and configuration. |
+| `.github/workflows/dockerfile-lint.yml` | Hadolint checks for a caller-selected Dockerfile. |
+| `.github/workflows/rust-docker-publish.yml` | Check out, build and publish a signed Rust service image from a caller commit or validated version tag. |
 | `actions/setup-node` | Set up a caller-selected Node version and locked npm or pnpm dependencies inside a custom job. |
 | `actions/rust-audit` | Run cargo-audit and report its findings for an already checked-out working directory. |
-| `actions/publish-image` | Push a built image, sign and verify its digest, then promote the current default branch head to `latest`. |
+| `actions/publish-image` | Optionally build an image and log in to GHCR, push it, sign and verify its digest, then promote the current default branch head to `latest`. |
 | `actions/cargo-tag` | Tag a root Cargo version bump and dispatch `release.yml`, with retryable dispatch failures. |
 | `actions/package-rust-binary` | Archive a built target binary, README and license with a SHA-256 checksum on Linux or macOS. |
 
@@ -46,14 +49,20 @@ jobs:
 Markdown lint accepts newline-delimited `globs` and an optional `config` path.
 It uses the caller's Markdown configuration and fails on lint errors; it does
 not rewrite files. See [`examples/markdownlint.yml`](examples/markdownlint.yml).
+Dockerfile lint accepts `dockerfile`, defaulting to `Dockerfile`, and uses the
+caller's Hadolint configuration.
 
 Rust CI uses the caller's Rust toolchain configuration when present, otherwise
-the runner's active toolchain. It requires a committed `Cargo.lock` and a
-caller-owned `deny.toml` with an explicit license allowlist; see
+the runner's active toolchain. It requires a committed `Cargo.lock`. Cargo-deny
+is enabled by default and requires a caller-owned `deny.toml` with an explicit
+license allowlist; see
 [`examples/deny.toml`](examples/deny.toml). Cargo-deny is installed with its
 required Rust 1.88 toolchain without changing the project's selected compiler.
-Specialized database, coverage, code generation,
-browser and release checks belong in caller workflows.
+Set `run-tests: false` when a caller job already runs coverage or specialized
+tests. Format, Clippy, check and cargo-deny still run. Specialized database,
+coverage, code generation and browser checks belong in caller workflows.
+Callers without a cargo-deny policy can set `run-deny: false`.
+Cargo-sort uses its upstream release binary with a pinned SHA-256 checksum.
 
 ## Adoption
 
@@ -91,10 +100,26 @@ the workflow log retains the full JSON audit report.
 
 ## Development and releases
 
-Container callers retain their build, vulnerability scan, registry login,
-triggers and publication concurrency. Pass the built `image` tag, existing
+Rust services call `rust-docker-publish.yml` with the untagged `image` repository
+and `signing-key` / `signing-password` secrets. It owns checkout, GHCR login,
+Docker build, signing, verification and promotion of the verified digest to
+`latest` while the commit is the current default branch head. CI images use
+`sha-<caller commit>` tags. Set `release-tag` to check out `refs/tags/<tag>` and
+require the root Cargo package version to match before building the release image.
+Tag builds use the same current-head policy for image `latest`; GitHub Release
+latest selection is separate.
+The `image` output gives subsequent release jobs the full published image tag.
+Callers retain triggers, test gates and publication concurrency, and grant
+`contents: read` and `packages: write` to the calling job.
+
+Container callers retain their vulnerability scan, triggers and publication
+concurrency. Pass the `image` tag, existing
 `signing-key` and `signing-password` secrets, and caller `token` to
-`actions/publish-image`. It keeps cosign v2.6.5 signatures compatible with
+`actions/publish-image`. Set `build-context: .` to share GHCR login and the Docker
+build with `--pull` and a `GIT_COMMIT` build argument from the checked-out commit.
+GHCR login uses the caller token and actor; other registries require caller-owned
+authentication. Omit `build-context` to publish an already built and authenticated
+image. The action keeps cosign v2.6.5 signatures compatible with
 existing key-based verifiers. A failed push, signature, verification or branch
 lookup cannot promote `latest`. Use `promote-latest: "false"` for release-only
 tags; `require-current-head: "false"` supports an explicitly different caller
@@ -109,17 +134,34 @@ root `package.version` or `workspace.package.version`, creates the tag on the
 requested commit, and dispatches the caller's `release.yml` on its default
 branch. It never moves existing tags. Rerunning a failed dispatch resumes the
 same tag when it already points to that commit. Callers retain their existing
-CI/release gates and artifact build matrices.
+CI/release gates and target selection.
 Serialize tagging with `queue: max`, as in [`examples/cargo-tag.yml`](examples/cargo-tag.yml),
 so a newer push cannot replace a pending version-bump run. The shared CI pins
 actionlint v1.7.12, which does not yet recognize that GitHub concurrency key;
 the example is validated by the consumer workflow runs.
 
-After building a binary, pass its `binary`, `tag` and `target` to
-`actions/package-rust-binary`. It reads `target/<target>/release/<binary>`,
+For standard Rust binary releases, call `rust-binary-release.yml` with the
+`binary` name and explicit `tag`. It defaults to a static x86_64 Linux build
+with cross. The optional `targets` input is a JSON array of `target`, `os` and
+`builder` (`cargo` or `cross`) objects; native and cross-compiled Mac targets
+use cargo. See [`examples/rust-binary-release.yml`](examples/rust-binary-release.yml).
+Keep tag-push and manual triggers in the caller and grant the calling job
+`contents: write`; only the shared publication job receives that permission.
+Build jobs use read-only tokens and always check out the release tag.
+Version tags may include prerelease and build-metadata suffixes. Prereleases
+are marked explicitly and cannot replace the latest stable release.
+Stable releases use GitHub's `legacy` latest selection.
+For build validation, `publish-release: false` checks out the caller commit,
+uploads the same archives and skips release creation. A valid `tag` string is
+still required for archive names, but the Git tag does not need to exist.
+
+Custom release pipelines can instead pass a built binary's `binary`, `tag` and
+`target` to `actions/package-rust-binary`. It reads
+`target/<target>/release/<binary>`,
 `README.md` and `LICENSE`, and creates
-`<binary>-<tag>-<target>.tar.gz` plus `.tar.gz.sha256`. Upload and release
-publication stay in the caller.
+`<binary>-<tag>-<target>.tar.gz` plus `.tar.gz.sha256`. Both the release workflow
+and packaging action accept `working-directory` for nested Rust projects.
+Custom callers retain upload and release publication.
 
 Use Python 3.11 or newer, Go and ShellCheck. Run from the repository root:
 
@@ -131,15 +173,17 @@ python3 -m unittest discover -s tests -v
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 ```
 
-CI exercises shared CI workflows with fixtures, Node 22 and 26, custom package
-scripts and tests, a skipped build, Markdown lint, npm with
+CI exercises shared CI workflows with fixtures, Rust checks with and without shared tests,
+Node 22 and 26, custom package scripts and tests, a skipped build, Markdown and
+Dockerfile lint, npm with
 lifecycle scripts disabled, rejected stale pnpm lockfiles and a real
 cargo-audit report. Unit tests cover advisory exceptions, issue pagination,
 create/update/close behavior, oversized reports and operational failures.
 An ephemeral registry test builds, signs, verifies and promotes an image with
 a temporary test key. Publication unit tests cover stale commits and failed
 signing/verification; tagging and archive tests cover recovery and artifact
-integrity.
+integrity. A build-only release fixture checks Linux and both Mac architectures,
+archive contents, executable permissions and checksums, and runs the Linux binary.
 
 Reusable workflows pin this repository's composite actions as dependencies,
 just like third-party actions. When editing an action, commit it first, update

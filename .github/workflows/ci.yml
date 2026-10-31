@@ -30,6 +30,48 @@ jobs:
     with:
       working-directory: tests/fixtures/rust
 
+  rust-without-tests:
+    name: Rust caller without shared tests
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      working-directory: tests/fixtures/rust
+      run-tests: false
+
+  binary-release:
+    name: Build binary release artifacts without publishing
+    uses: ./.github/workflows/rust-binary-release.yml
+    permissions:
+      contents: write
+    with:
+      binary: workflow-fixture
+      tag: v0.1.0-rc.1+build.4
+      working-directory: tests/fixtures/rust
+      publish-release: false
+      targets: |
+        [
+          {"target":"x86_64-unknown-linux-musl","os":"ubuntu-latest","builder":"cross"},
+          {"target":"aarch64-apple-darwin","os":"macos-latest","builder":"cargo"},
+          {"target":"x86_64-apple-darwin","os":"macos-latest","builder":"cargo"}
+        ]
+
+  verify-binary-release:
+    name: Verify binary release archives
+    needs: binary-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: workflow-fixture-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Verify contents, checksums, architectures and the Linux executable
+        run: python3 tests/check_binary_release.py
+
   node:
     name: Node caller (${{ matrix.node }})
     strategy:
@@ -57,6 +99,11 @@ jobs:
     with:
       globs: tests/fixtures/markdownlint/**/*.md
       config: tests/fixtures/markdownlint/policy.markdownlint-cli2.jsonc
+
+  dockerfile-lint:
+    uses: ./.github/workflows/dockerfile-lint.yml
+    with:
+      dockerfile: tests/fixtures/docker context/Dockerfile
 
   npm:
     name: npm lifecycle scripts disabled
@@ -118,7 +165,7 @@ jobs:
           report-issues: "false"
 
   image:
-    name: Sign and verify an image in an ephemeral registry
+    name: Build, sign and verify an image in an ephemeral registry
     runs-on: ubuntu-latest
     services:
       registry:
@@ -132,13 +179,11 @@ jobs:
         with:
           cosign-release: v2.6.5
 
-      - name: Build a test image and generate an ephemeral signing key
+      - name: Generate an ephemeral signing key
         id: key
         env:
           COSIGN_PASSWORD: fixture-password
         run: |
-          printf 'FROM scratch\nCOPY README.md /README.md\n' > "$RUNNER_TEMP/Dockerfile"
-          docker build --file "$RUNNER_TEMP/Dockerfile" --tag localhost:5000/fixture:test .
           cosign generate-key-pair --output-key-prefix "$RUNNER_TEMP/fixture"
           while IFS= read -r line; do
             echo "::add-mask::$line"
@@ -153,6 +198,7 @@ jobs:
         id: publish
         with:
           image: localhost:5000/fixture:test
+          build-context: tests/fixtures/docker context
           signing-key: ${{ steps.key.outputs.key }}
           signing-password: fixture-password
           token: ${{ github.token }}
@@ -163,31 +209,8 @@ jobs:
         env:
           EXPECTED_DIGEST: ${{ steps.publish.outputs.digest }}
         run: |
+          revision=$(docker image inspect localhost:5000/fixture:test --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+          test "$revision" = "$(git rev-parse --short HEAD)"
           actual=$(docker buildx imagetools inspect localhost:5000/fixture:latest --format '{{json .Manifest.Digest}}')
           test "$actual" = "\"$EXPECTED_DIGEST\""
           cosign verify --insecure-ignore-tlog=true --key "$RUNNER_TEMP/fixture.pub" localhost:5000/fixture:latest
-
-  package:
-    name: Binary archive (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Create a built-binary fixture
-        run: |
-          mkdir -p target/fixture-target/release
-          printf 'fixture binary\n' > target/fixture-target/release/fixture
-          chmod 755 target/fixture-target/release/fixture
-
-      - uses: ./actions/package-rust-binary
-        with:
-          binary: fixture
-          tag: v1.0.0
-          target: fixture-target
-
-      - name: Check archive layout, permissions and checksums
-        run: python3 -m unittest discover -s tests -p test_package_binary.py -v

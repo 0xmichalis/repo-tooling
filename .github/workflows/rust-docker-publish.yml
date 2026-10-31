@@ -1,0 +1,77 @@
+name: Rust Docker publication
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Fully qualified image repository, without a tag.
+        type: string
+        required: true
+      release-tag:
+        description: Build a version tag matching Cargo.toml; empty builds the caller commit as sha-<commit>.
+        type: string
+        default: ""
+    secrets:
+      signing-key:
+        required: true
+      signing-password:
+        required: true
+    outputs:
+      image:
+        description: Published image tag.
+        value: ${{ jobs.publish.outputs.image }}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, Sign and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_TAG: ${{ inputs.release-tag }}
+      IMAGE_TAG: ${{ inputs.image }}:${{ inputs.release-tag || format('sha-{0}', github.sha) }}
+    outputs:
+      image: ${{ env.IMAGE_TAG }}
+    steps:
+      - name: Validate release tag
+        if: inputs.release-tag != ''
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+            echo "refusing to release a tag that is not vMAJOR.MINOR.PATCH: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release-tag != '' && format('refs/tags/{0}', inputs.release-tag) || github.sha }}
+          persist-credentials: false
+
+      - name: Check Cargo.toml version matches the tag
+        if: inputs.release-tag != ''
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import tomllib
+
+          version = tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]
+          tag = os.environ["RELEASE_TAG"]
+          if tag != f"v{version}":
+              raise SystemExit(f"Cargo.toml version v{version} does not match tag {tag}")
+          PY
+
+      # Image latest follows the default branch head, including matching tag builds.
+      - name: Build and publish signed image
+        uses: 0xmichalis/repo-tooling/actions/publish-image@07457c5c82d294d8060f4dc1d8156c799f3d9a9f
+        with:
+          image: ${{ env.IMAGE_TAG }}
+          build-context: .
+          signing-key: ${{ secrets.signing-key }}
+          signing-password: ${{ secrets.signing-password }}
+          token: ${{ github.token }}

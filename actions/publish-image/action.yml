@@ -1,10 +1,13 @@
 name: Publish a signed image
-description: Push an already built image, sign and verify its digest, then promote latest.
+description: Optionally build an image, push it, sign and verify its digest, then promote latest.
 
 inputs:
   image:
-    description: Fully qualified tag of an image already built and authenticated by the caller.
+    description: Fully qualified image tag to build or publish.
     required: true
+  build-context:
+    description: Docker build context; empty publishes an image already built and authenticated by the caller.
+    default: ""
   signing-key:
     description: Existing cosign private key from the caller's secrets.
     required: true
@@ -12,7 +15,7 @@ inputs:
     description: Password for the caller's cosign private key.
     required: true
   token:
-    description: Caller token for checking the current default branch head.
+    description: Caller token for checking the current default branch head and GHCR login when building.
     required: true
   promote-latest:
     description: Promote the signed digest to latest after successful verification.
@@ -32,6 +35,23 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Log in to GHCR
+      if: inputs.build-context != '' && startsWith(inputs.image, 'ghcr.io/')
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+    - name: Build Docker image
+      if: inputs.build-context != ''
+      shell: bash
+      env:
+        IMAGE_TAG: ${{ inputs.image }}
+        BUILD_CONTEXT: ${{ inputs.build-context }}
+      run: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        docker build --pull --build-arg GIT_COMMIT="$GIT_COMMIT" -t "$IMAGE_TAG" "$BUILD_CONTEXT"
+
     - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       with:
         cosign-release: v2.6.5

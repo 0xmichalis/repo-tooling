@@ -10,12 +10,20 @@ on:
         description: Directory containing Cargo.toml and Cargo.lock.
         type: string
         default: .
+      run-tests:
+        description: Run cargo test; disable when the caller owns coverage or integration tests.
+        type: boolean
+        default: true
+      run-deny:
+        description: Run cargo-deny using the caller's dependency policy.
+        type: boolean
+        default: true
 
 env:
   CARGO_TERM_COLOR: always
-  # Pinned tool versions. Each is cached by version as a standalone binary, so
-  # bumping a version here is the only thing that triggers a reinstall.
-  CARGO_SORT_VERSION: "2.0.1"
+  # Shared tool versions and the checksum of cargo-sort's upstream release.
+  CARGO_SORT_VERSION: "2.1.4"
+  CARGO_SORT_SHA256: "c35c3df1f2e512890ee2ffd6151aa265fbfe06accbea0d9226e0bb14d821845b"
   CARGO_DENY_VERSION: "0.19.8"
 
 jobs:
@@ -37,19 +45,17 @@ jobs:
         rustup component add rustfmt
         rustup show
 
-    - name: Cache cargo-sort binary
-      id: cache-cargo-sort
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ runner.tool_cache }}/cargo-sort
-        key: cargo-sort-bin-${{ env.CARGO_SORT_VERSION }}
-
-    - name: Add cargo-sort to PATH
-      run: echo "${{ runner.tool_cache }}/cargo-sort/bin" >> "$GITHUB_PATH"
-
     - name: Install cargo-sort
-      if: steps.cache-cargo-sort.outputs.cache-hit != 'true'
-      run: cargo install --root "${{ runner.tool_cache }}/cargo-sort" --version ${{ env.CARGO_SORT_VERSION }} --locked cargo-sort
+      run: |
+        set -euo pipefail
+        cargo_sort_bin_dir="${{ runner.tool_cache }}/cargo-sort/bin"
+        cargo_sort_archive="$RUNNER_TEMP/cargo-sort.tar.gz"
+        mkdir -p "$cargo_sort_bin_dir"
+        curl -fsSL --retry 3 -o "$cargo_sort_archive" \
+          "https://github.com/DevinR528/cargo-sort/releases/download/v${CARGO_SORT_VERSION}/cargo-sort-x86_64-unknown-linux-gnu.tar.gz"
+        echo "${CARGO_SORT_SHA256}  ${cargo_sort_archive}" | sha256sum -c -
+        tar -xzf "$cargo_sort_archive" -C "$cargo_sort_bin_dir" cargo-sort
+        echo "$cargo_sort_bin_dir" >> "$GITHUB_PATH"
 
     - name: Check Format
       run: cargo fmt --all -- --check
@@ -118,6 +124,7 @@ jobs:
 
   test:
     name: Run Tests
+    if: inputs.run-tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -147,6 +154,7 @@ jobs:
 
   deny:
     name: Cargo Deny
+    if: inputs.run-deny
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -1,0 +1,32 @@
+name: Dockerfile lint
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile:
+        description: Path to the Dockerfile, relative to the caller repository.
+        type: string
+        default: Dockerfile
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint Dockerfile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The pinned action re-evaluates its arguments in Bash.
+      - name: Escape Dockerfile path
+        id: dockerfile
+        env:
+          DOCKERFILE: ${{ inputs.dockerfile }}
+        run: printf 'path=%q\n' "$DOCKERFILE" >> "$GITHUB_OUTPUT"
+
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: -- ${{ steps.dockerfile.outputs.path }}
