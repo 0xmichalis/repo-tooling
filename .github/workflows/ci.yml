@@ -56,7 +56,7 @@ jobs:
     uses: ./.github/workflows/markdownlint.yml
     with:
       globs: tests/fixtures/markdownlint/**/*.md
-      config: tests/fixtures/markdownlint/policy.jsonc
+      config: tests/fixtures/markdownlint/policy.markdownlint-cli2.jsonc
 
   npm:
     name: npm lifecycle scripts disabled
