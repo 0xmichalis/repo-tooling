@@ -1,0 +1,32 @@
+name: Tag a Cargo version bump
+description: Create a root crate/workspace version tag and dispatch its release workflow.
+
+inputs:
+  before-sha:
+    description: Commit before the push, from github.event.before.
+    required: true
+  sha:
+    description: Commit to tag, defaulting to github.sha.
+    default: ""
+  token:
+    description: Caller token with contents write and actions write permissions.
+    required: true
+
+outputs:
+  tag:
+    description: Created or resumed version tag; empty when the version is unchanged.
+    value: ${{ steps.tag.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Tag version bump and dispatch release
+      id: tag
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        BEFORE_SHA: ${{ inputs.before-sha }}
+        CURRENT_SHA: ${{ inputs.sha || github.sha }}
+        GH_TOKEN: ${{ inputs.token }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: python3 "$ACTION_PATH/tag.py"

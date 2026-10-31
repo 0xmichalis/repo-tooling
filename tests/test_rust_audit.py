@@ -120,6 +120,31 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(json.loads(run.call_args.kwargs["input"]), {"body": body})
             self.assertEqual(run.call_args.args[0][-2:], ["--input", "-"])
 
+    def test_lockfile_identity_is_canonical_and_preserves_root_issue(self):
+        self.assertEqual(audit.issue_title("/workspace", "/workspace"), audit.ISSUE_TITLE)
+        self.assertEqual(
+            audit.issue_title("/workspace", "/workspace/service/../api"),
+            audit.ISSUE_TITLE + " (api/Cargo.lock)",
+        )
+        self.assertNotEqual(
+            audit.issue_title("/workspace", "/workspace/api"),
+            audit.issue_title("/workspace", "/workspace/worker"),
+        )
+
+    def test_clean_nested_audit_does_not_close_root_issue(self):
+        with patch.object(audit, "github_api", return_value=[[{"number": 12, "title": audit.ISSUE_TITLE}]]) as api:
+            audit.sync_issue([], "owner/project", "abc123", "https://example.test/run", "", audit.ISSUE_TITLE + " (api/Cargo.lock)")
+            self.assertEqual(api.call_count, 1)
+
+    def test_read_only_audit_never_calls_github_or_git(self):
+        with patch.dict(audit.os.environ, {"REPORT_ISSUES": "false"}):
+            with patch.object(audit, "audit", return_value=[]) as run:
+                with patch.object(audit, "github_api") as api, patch.object(audit.subprocess, "check_output") as git:
+                    self.assertEqual(audit.main(), 0)
+                    run.assert_called_once()
+                    api.assert_not_called()
+                    git.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

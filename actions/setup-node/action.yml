@@ -4,7 +4,10 @@ description: Install the caller's Node version and locked npm or pnpm dependenci
 inputs:
   node-version:
     description: Node version supported by the caller.
-    required: true
+    default: ""
+  node-version-file:
+    description: Caller-owned .nvmrc or .node-version file instead of node-version.
+    default: ""
   package-manager:
     description: npm or pnpm; pnpm's version comes from package.json.
     default: pnpm
@@ -27,10 +30,16 @@ runs:
         PACKAGE_MANAGER: ${{ inputs.package-manager }}
         INSTALL_DEPENDENCIES: ${{ inputs.install-dependencies }}
         IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        NODE_VERSION: ${{ inputs.node-version }}
+        NODE_VERSION_FILE: ${{ inputs.node-version-file }}
       run: |
         case "$PACKAGE_MANAGER" in npm|pnpm) ;; *) exit 1 ;; esac
         case "$INSTALL_DEPENDENCIES" in true|false) ;; *) exit 1 ;; esac
         case "$IGNORE_SCRIPTS" in true|false) ;; *) exit 1 ;; esac
+        if [[ -n "$NODE_VERSION" && -n "$NODE_VERSION_FILE" ]] || [[ -z "$NODE_VERSION" && -z "$NODE_VERSION_FILE" ]]; then
+          echo 'Specify exactly one of node-version and node-version-file.' >&2
+          exit 1
+        fi
 
     - name: Set up pnpm
       if: inputs.package-manager == 'pnpm'
@@ -42,6 +51,7 @@ runs:
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
       with:
         node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version-file }}
         cache: ${{ inputs.package-manager }}
         cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
 

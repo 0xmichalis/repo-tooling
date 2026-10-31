@@ -11,6 +11,9 @@ inputs:
   token:
     description: Caller token with contents read and issues write permissions.
     required: true
+  report-issues:
+    description: Set to false for read-only CI audits without issue synchronization.
+    default: "true"
 
 runs:
   using: composite
@@ -46,5 +49,6 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         GH_TOKEN: ${{ inputs.token }}
         DENY_CONFIG: ${{ inputs.deny-config }}
+        REPORT_ISSUES: ${{ inputs.report-issues }}
         CARGO_TERM_COLOR: never
       run: python3 "$ACTION_PATH/audit.py"
