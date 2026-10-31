@@ -16,7 +16,7 @@ targets = {
 artifacts = Path("artifacts")
 expected = set()
 for target, cpu in targets.items():
-    name = f"workflow-fixture-v0.1.0-{target}"
+    name = f"workflow-fixture-v0.1.0-rc.1+build.4-{target}"
     archive = artifacts / f"{name}.tar.gz"
     checksum = artifacts / f"{name}.tar.gz.sha256"
     expected.update([archive.name, checksum.name])

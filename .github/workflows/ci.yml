@@ -44,7 +44,7 @@ jobs:
       contents: write
     with:
       binary: workflow-fixture
-      tag: v0.1.0
+      tag: v0.1.0-rc.1+build.4
       working-directory: tests/fixtures/rust
       publish-release: false
       targets: |

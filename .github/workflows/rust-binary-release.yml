@@ -35,6 +35,8 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    outputs:
+      prerelease: ${{ steps.validate.outputs.prerelease }}
     permissions:
       contents: read
     strategy:
@@ -47,11 +49,12 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Validate release tag and builder
+        id: validate
         working-directory: .
         env:
           BUILDER: ${{ matrix.builder }}
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?$ ]]; then
             echo "refusing to release a tag that is not vMAJOR.MINOR.PATCH: $RELEASE_TAG" >&2
             exit 1
           fi
@@ -59,12 +62,18 @@ jobs:
             cargo|cross) ;;
             *) echo "builder must be cargo or cross: $BUILDER" >&2; exit 1 ;;
           esac
+          version="${RELEASE_TAG%%+*}"
+          if [[ "$version" == *-* ]]; then
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+          fi
 
       # Release builds always check out the tag, including on workflow_dispatch.
       # Build-only callers validate their current commit without creating a tag.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.publish-release && inputs.tag || github.sha }}
+          ref: ${{ inputs.publish-release && format('refs/tags/{0}', inputs.tag) || github.sha }}
           persist-credentials: false
 
       - name: Install Rust
@@ -91,7 +100,7 @@ jobs:
 
       - name: Package binary and checksum
         id: package
-        uses: 0xmichalis/repo-tooling/actions/package-rust-binary@e0c6fd33b28d62d4c2361c4bb233f43a6058377a
+        uses: 0xmichalis/repo-tooling/actions/package-rust-binary@4332a3d6c79aa32ecaf3c32ebb535e99fe400725
         with:
           binary: ${{ inputs.binary }}
           tag: ${{ inputs.tag }}
@@ -127,6 +136,8 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           draft: false
+          prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.build.outputs.prerelease == 'true' && 'false' || 'true' }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |

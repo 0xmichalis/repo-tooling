@@ -125,6 +125,8 @@ use cargo. See [`examples/rust-binary-release.yml`](examples/rust-binary-release
 Keep tag-push and manual triggers in the caller and grant the calling job
 `contents: write`; only the shared publication job receives that permission.
 Build jobs use read-only tokens and always check out the release tag.
+Version tags may include prerelease and build-metadata suffixes. Prereleases
+are marked explicitly and cannot replace the latest stable release.
 For build validation, `publish-release: false` checks out the caller commit,
 uploads the same archives and skips release creation without requiring a tag.
 
