@@ -1,0 +1,31 @@
+name: Package a Rust release binary
+description: Archive a built target binary, README and license with a portable SHA-256 checksum.
+
+inputs:
+  binary:
+    description: Cargo binary name.
+    required: true
+  tag:
+    description: Release tag in vMAJOR.MINOR.PATCH format.
+    required: true
+  target:
+    description: Rust target triple used by the caller's build.
+    required: true
+
+outputs:
+  archive:
+    description: Created tar.gz filename.
+    value: ${{ steps.package.outputs.archive }}
+
+runs:
+  using: composite
+  steps:
+    - name: Package binary and checksum
+      id: package
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        BINARY: ${{ inputs.binary }}
+        RELEASE_TAG: ${{ inputs.tag }}
+        TARGET: ${{ inputs.target }}
+      run: python3 "$ACTION_PATH/package.py"

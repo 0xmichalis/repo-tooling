@@ -1,0 +1,52 @@
+name: Publish a signed image
+description: Push an already built image, sign and verify its digest, then promote latest.
+
+inputs:
+  image:
+    description: Fully qualified tag of an image already built and authenticated by the caller.
+    required: true
+  signing-key:
+    description: Existing cosign private key from the caller's secrets.
+    required: true
+  signing-password:
+    description: Password for the caller's cosign private key.
+    required: true
+  token:
+    description: Caller token for checking the current default branch head.
+    required: true
+  promote-latest:
+    description: Promote the signed digest to latest after successful verification.
+    default: "true"
+  require-current-head:
+    description: Only promote when the checked-out commit is still the default branch head.
+    default: "true"
+  transparency-log:
+    description: Require transparency-log signing and verification; false supports offline registries.
+    default: "true"
+
+outputs:
+  digest:
+    description: Signed and verified image digest.
+    value: ${{ steps.publish.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      with:
+        cosign-release: v2.6.5
+
+    - name: Push, sign, verify and promote
+      id: publish
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        IMAGE_TAG: ${{ inputs.image }}
+        COSIGN_PRIVATE_KEY: ${{ inputs.signing-key }}
+        COSIGN_PASSWORD: ${{ inputs.signing-password }}
+        GH_TOKEN: ${{ inputs.token }}
+        PROMOTE_LATEST: ${{ inputs.promote-latest }}
+        REQUIRE_CURRENT_HEAD: ${{ inputs.require-current-head }}
+        TRANSPARENCY_LOG: ${{ inputs.transparency-log }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: python3 "$ACTION_PATH/publish.py"

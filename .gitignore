@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+target/
+node_modules/
+tests/fixtures/pnpm/checks.json

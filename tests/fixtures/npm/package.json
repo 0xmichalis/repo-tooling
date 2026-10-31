@@ -1,0 +1,8 @@
+{
+  "name": "npm-workflow-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "node -e \"throw new Error('Lifecycle scripts must be disabled')\""
+  }
+}

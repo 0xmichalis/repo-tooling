@@ -1,0 +1,16 @@
+name: CI
+
+# Commit Cargo.lock and a project-specific deny.toml (see examples/deny.toml).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: 0xmichalis/repo-tooling/.github/workflows/rust-ci.yml@v1.0.0

@@ -1,0 +1,9 @@
+[bans]
+multiple-versions = "deny"
+
+[licenses]
+allow = ["MIT"]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -1,0 +1,54 @@
+name: Audit Rust dependencies
+description: Audit Cargo.lock and maintain one issue for vulnerable dependencies.
+
+inputs:
+  working-directory:
+    description: Directory containing the caller's Cargo.lock.
+    default: .
+  deny-config:
+    description: Optional cargo-deny configuration supplying advisory ignores.
+    default: ""
+  token:
+    description: Caller token with contents read and issues write permissions.
+    required: true
+  report-issues:
+    description: Set to false for read-only CI audits without issue synchronization.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        rustup show active-toolchain || rustup toolchain install
+        rustup show
+
+    - name: Cache cargo-audit
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.tool_cache }}/cargo-audit
+        key: cargo-audit-${{ runner.os }}-${{ runner.arch }}-0.22.0
+
+    - name: Add cargo-audit to PATH
+      shell: bash
+      run: echo "${{ runner.tool_cache }}/cargo-audit/bin" >> "$GITHUB_PATH"
+
+    - name: Install cargo-audit
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: cargo install --root "${{ runner.tool_cache }}/cargo-audit" --version 0.22.0 --locked cargo-audit
+
+    - name: Audit and report
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ inputs.token }}
+        DENY_CONFIG: ${{ inputs.deny-config }}
+        REPORT_ISSUES: ${{ inputs.report-issues }}
+        CARGO_TERM_COLOR: never
+      run: python3 "$ACTION_PATH/audit.py"
