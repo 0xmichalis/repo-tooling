@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Workflow and helper checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test audit failure paths and issue lifecycle
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Lint workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+
+  rust:
+    name: Rust caller
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      working-directory: tests/fixtures/rust
+
+  node:
+    name: Node caller (${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "26"]
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      node-version: ${{ matrix.node }}
+      working-directory: tests/fixtures/pnpm
+
+  npm:
+    name: npm lifecycle scripts disabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./actions/setup-node
+        with:
+          node-version: "22"
+          package-manager: npm
+          working-directory: tests/fixtures/npm
+          ignore-scripts: "true"
+
+  frozen-lockfile:
+    name: Reject stale pnpm lockfiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Make the manifest disagree with its lockfile
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('tests/fixtures/pnpm/package.json')
+          manifest = json.loads(path.read_text())
+          manifest['dependencies'] = {'is-number': '7.0.0'}
+          path.write_text(json.dumps(manifest))
+          PY
+
+      - uses: ./actions/setup-node
+        id: install
+        continue-on-error: true
+        with:
+          node-version: "22"
+          working-directory: tests/fixtures/pnpm
+
+      - name: Require the installation to fail
+        env:
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+        run: test "$INSTALL_OUTCOME" = failure
+
+  audit:
+    name: Audit a real Cargo.lock
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./actions/rust-audit
+        with:
+          working-directory: tests/fixtures/rust
+          token: ${{ github.token }}

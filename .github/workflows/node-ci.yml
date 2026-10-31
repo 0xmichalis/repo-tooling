@@ -1,0 +1,46 @@
+name: Node CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node version supported by the caller.
+        required: true
+        type: string
+      working-directory:
+        description: Directory containing package.json and pnpm-lock.yaml.
+        type: string
+        default: .
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: 0xmichalis/repo-tooling/actions/setup-node@c54763b14e08d7db3495ace5f41a6e52f59be631
+        with:
+          node-version: ${{ inputs.node-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run linter
+        run: pnpm lint
+
+      - name: Check types
+        run: pnpm type-check
+
+      - name: Build project
+        run: pnpm build

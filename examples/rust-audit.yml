@@ -1,0 +1,14 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    uses: 0xmichalis/repo-tooling/.github/workflows/rust-audit.yml@v1.0.0
