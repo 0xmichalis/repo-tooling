@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - uses: 0xmichalis/repo-tooling/actions/rust-audit@5a7433f0f8548dced1086d28bb1e0d8a15acb150
+      - uses: 0xmichalis/repo-tooling/actions/rust-audit@8f5e2c876d4c1e711bdf8bdea66188daff8e6166
         with:
           working-directory: ${{ inputs.working-directory }}
           deny-config: ${{ inputs.deny-config }}
