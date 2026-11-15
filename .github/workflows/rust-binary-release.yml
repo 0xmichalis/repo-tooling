@@ -87,7 +87,7 @@ jobs:
       # cross supplies the C compiler and cmake needed by musl TLS dependencies.
       - name: Install cross
         if: matrix.builder == 'cross'
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cross
 
@@ -100,7 +100,7 @@ jobs:
 
       - name: Package binary and checksum
         id: package
-        uses: 0xmichalis/repo-tooling/actions/package-rust-binary@8f5e2c876d4c1e711bdf8bdea66188daff8e6166
+        uses: 0xmichalis/repo-tooling/actions/package-rust-binary@595ae285704a99ff17e78188d073fb107adac555
         with:
           binary: ${{ inputs.binary }}
           tag: ${{ inputs.tag }}
@@ -132,7 +132,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ inputs.tag }}
           draft: false
