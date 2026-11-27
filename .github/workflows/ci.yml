@@ -118,6 +118,31 @@ jobs:
           working-directory: tests/fixtures/npm
           ignore-scripts: "true"
 
+  node-setup-only:
+    name: Set up pnpm without installing dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/fixtures/pnpm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Remove the lockfile to require cache-free setup
+        run: rm pnpm-lock.yaml
+
+      - uses: ./actions/setup-node
+        with:
+          node-version: "22"
+          working-directory: tests/fixtures/pnpm
+          install-dependencies: "false"
+
+      - name: Verify pnpm is available without an install
+        run: |
+          pnpm --version
+          test ! -e node_modules
+
   frozen-lockfile:
     name: Reject stale pnpm lockfiles
     runs-on: ubuntu-latest
