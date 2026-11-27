@@ -41,19 +41,36 @@ runs:
           exit 1
         fi
 
+    - name: Set up Node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: ${{ inputs.install-dependencies == 'true' && inputs.package-manager == 'npm' && 'npm' || '' }}
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+        package-manager-cache: false
+
     - name: Set up pnpm
       if: inputs.package-manager == 'pnpm'
       uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       with:
         package_json_file: ${{ inputs.working-directory }}/package.json
 
-    - name: Set up Node
-      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+    - name: Locate the pnpm store
+      if: inputs.install-dependencies == 'true' && inputs.package-manager == 'pnpm'
+      id: pnpm-store
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        store=$(pnpm store path --silent)
+        printf 'path=%s\n' "$store" >> "$GITHUB_OUTPUT"
+
+    - name: Cache the pnpm store
+      if: inputs.install-dependencies == 'true' && inputs.package-manager == 'pnpm'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        node-version: ${{ inputs.node-version }}
-        node-version-file: ${{ inputs.node-version-file }}
-        cache: ${{ inputs.package-manager }}
-        cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', inputs.working-directory)) }}
 
     - name: Install locked dependencies
       if: inputs.install-dependencies == 'true'
